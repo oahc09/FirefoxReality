@@ -21,7 +21,6 @@ import org.mozilla.vrbrowser.telemetry.GleanMetricsService;
 import org.mozilla.vrbrowser.ui.widgets.WidgetManagerDelegate;
 import org.mozilla.vrbrowser.ui.widgets.WidgetPlacement;
 import org.mozilla.vrbrowser.utils.StringUtils;
-import org.mozilla.vrbrowser.utils.UrlUtils;
 
 import java.util.ArrayList;
 
@@ -85,14 +84,14 @@ public class ContextMenuWidget extends MenuWidget {
         if (aContextElement.linkUri != null && !aContextElement.linkUri.isEmpty()) {
             mItems.add(new MenuWidget.MenuItem(aContextElement.linkUri, 0, null));
             if (mWidgetManager.canOpenNewWindow()) {
-                mItems.add(new MenuWidget.MenuItem(getContext().getString(R.string.context_menu_open_new_window_1), 0, () -> {
+                mItems.add(new MenuWidget.MenuItem(getContext().getString(R.string.context_menu_open_link_new_window_1), 0, () -> {
                     if (!StringUtils.isEmpty(aContextElement.linkUri)) {
                         widgetManager.openNewWindow(aContextElement.linkUri);
                     }
                     onDismiss();
                 }));
             }
-            mItems.add(new MenuWidget.MenuItem(getContext().getString(R.string.context_menu_open_new_tab_1), 0, () -> {
+            mItems.add(new MenuWidget.MenuItem(getContext().getString(R.string.context_menu_open_link_new_tab_1), 0, () -> {
                 if (!StringUtils.isEmpty(aContextElement.linkUri)) {
                     widgetManager.openNewTab(aContextElement.linkUri);
                     GleanMetricsService.Tabs.openedCounter(GleanMetricsService.Tabs.TabSource.CONTEXT_MENU);
@@ -110,28 +109,45 @@ public class ContextMenuWidget extends MenuWidget {
         } else {
             mItems.add(new MenuWidget.MenuItem(aContextElement.srcUri, 0, null));
         }
-        if (URLUtil.isHttpUrl(aContextElement.srcUri) || URLUtil.isHttpsUrl(aContextElement.srcUri)) {
-            @StringRes int srcText;
-            switch (aContextElement.type) {
-                case ContextElement.TYPE_IMAGE:
-                    srcText = R.string.context_menu_download_image;
-                    break;
-                case ContextElement.TYPE_VIDEO:
-                    srcText = R.string.context_menu_download_video;
-                    break;
-                case ContextElement.TYPE_AUDIO:
-                    srcText = R.string.context_menu_download_audio;
-                    break;
-                default:
-                    srcText = R.string.context_menu_download_link;
-                    break;
+        if (aContextElement.srcUri != null && !aContextElement.srcUri.isEmpty()) {
+            if (mWidgetManager.canOpenNewWindow()) {
+                mItems.add(new MenuWidget.MenuItem(getContext().getString(R.string.context_menu_open_new_window_1), 0, () -> {
+                    if (!StringUtils.isEmpty(aContextElement.srcUri)) {
+                        widgetManager.openNewWindow(aContextElement.srcUri);
+                    }
+                    onDismiss();
+                }));
             }
-            mItems.add(new MenuWidget.MenuItem(getContext().getString(srcText), 0, () -> {
-                DownloadJob job = DownloadJob.fromSrc(aContextElement);
-                widgetManager.getFocusedWindow().startDownload(job, false);
-                // TODO Add Download from context menu Telemetry
+            mItems.add(new MenuWidget.MenuItem(getContext().getString(R.string.context_menu_open_new_tab_1), 0, () -> {
+                if (!StringUtils.isEmpty(aContextElement.srcUri)) {
+                    widgetManager.openNewTab(aContextElement.srcUri);
+                    GleanMetricsService.Tabs.openedCounter(GleanMetricsService.Tabs.TabSource.CONTEXT_MENU);
+                }
                 onDismiss();
             }));
+            if (URLUtil.isHttpUrl(aContextElement.srcUri) || URLUtil.isHttpsUrl(aContextElement.srcUri)) {
+                @StringRes int srcText;
+                switch (aContextElement.type) {
+                    case ContextElement.TYPE_IMAGE:
+                        srcText = R.string.context_menu_download_image;
+                        break;
+                    case ContextElement.TYPE_VIDEO:
+                        srcText = R.string.context_menu_download_video;
+                        break;
+                    case ContextElement.TYPE_AUDIO:
+                        srcText = R.string.context_menu_download_audio;
+                        break;
+                    default:
+                        srcText = R.string.context_menu_download_link;
+                        break;
+                }
+                mItems.add(new MenuWidget.MenuItem(getContext().getString(srcText), 0, () -> {
+                    DownloadJob job = DownloadJob.fromSrc(aContextElement);
+                    widgetManager.getFocusedWindow().startDownload(job, false);
+                    // TODO Add Download from context menu Telemetry
+                    onDismiss();
+                }));
+            }
         }
         mItems.add(new MenuWidget.MenuItem(getContext().getString(R.string.context_menu_copy_link), 0, () -> {
             ClipboardManager clipboard = (ClipboardManager) getContext().getSystemService(Context.CLIPBOARD_SERVICE);
