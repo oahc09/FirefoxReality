@@ -60,3 +60,12 @@ div.ytp-fullscreen video, .fxr-vr-video {
     height: 100% !important;
     position: relative !important;
 }
+
+
+
+#items
+{
+	display: block;
+	height: 60%;
+	overflow-y:scroll;
+}
