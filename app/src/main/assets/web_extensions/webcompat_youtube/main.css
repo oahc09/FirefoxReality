@@ -62,7 +62,10 @@ div.ytp-fullscreen video, .fxr-vr-video {
 }
 
 
-
+/*
+   Force a fixed height so that Youtube mini player can have a scrollbar
+   for items in queue.
+*/
 #card #items
 {
 	display: block;
