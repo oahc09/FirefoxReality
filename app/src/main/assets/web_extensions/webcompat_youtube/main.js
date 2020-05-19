@@ -11,6 +11,7 @@ const YT_SELECTORS = {
   embedTitle: '.ytp-title-text',
   queueHandle: 'ytd-playlist-panel-video-renderer',
   playbackControls: '.ytp-left-controls'
+  overlays: '.videowall-endscreen, .ytp-upnext, .ytp-ce-element'
 };
 const ENABLE_LOGS = true;
 const logDebug = (...args) => ENABLE_LOGS && console.log(LOGTAG, ...args);
@@ -75,9 +76,25 @@ class YoutubeExtension {
         return text.includes('360');
     }
 
+    is360Video() {
+        const targets = [
+            document.querySelector(YT_SELECTORS.disclaimer),
+            document.querySelector(YT_SELECTORS.embedTitle)
+        ];
+        return targets.some((node) => node && this.is360(node.textContent));;
+    }
+
     isStereo(text) {
         const words = text.toLowerCase().split(/\s+|\./);
         return words.includes('stereo') || words.includes('3d') || words.includes('vr');
+    }
+
+    isStereoVideo() {
+        const targets = [
+            document.querySelector(YT_SELECTORS.disclaimer),
+            document.querySelector(YT_SELECTORS.embedTitle)
+        ];
+        return targets.some((node) => node && this.isStereo(node.textContent));;
     }
 
     // Automatically select a video projection if needed
@@ -94,14 +111,8 @@ class YoutubeExtension {
         }
         // There is no standard API to detect video projection yet.
         // Try to infer it from the video disclaimer or title for now.
-        const targets = [
-            document.querySelector(YT_SELECTORS.disclaimer),
-            document.querySelector(YT_SELECTORS.embedTitle)
-        ];
-        const is360 = targets.some((node) => node && this.is360(node.textContent));
-        if (is360) {
-            const stereo = targets.some((node) => node && this.isStereo(node.textContent));
-            qs.set('mozVideoProjection', stereo ? '360s_auto' : '360_auto');
+        if (this.is360Video()) {
+            qs.set('mozVideoProjection', this.isStereoVideo() ? '360s_auto' : '360_auto');
             this.updateURL(qs);
             this.updateVideoStyle();
             logDebug(`Video projection set to: ${qs.get(VIDEO_PROJECTION_PARAM)}`);
@@ -252,13 +263,40 @@ class YoutubeExtension {
         return video && video.readyState >=2;
     }
 
+    // Hide overlays when in immersive mode
+    // https://github.com/MozillaReality/FirefoxReality/issues/2673
+    hideOverlays() {
+        if (youtube.is360Video() || youtube.isStereoVideo()) {
+            var overlays = document.querySelectorAll(YT_SELECTORS.overlays);
+            var observer = new MutationObserver((mutations) => {
+                if (youtube.isInFullscreen()) {
+                    for (const mutation of mutations) {
+                        if (mutation.target) {
+                            mutation.target.style.display = 'none';
+                        }
+                    }
+                }
+            });
+            for(const overlay of overlays) {
+                observer.observe(overlay, { attributes: true });
+            }
+        }
+    }
+
+    isInFullscreen() {
+        return !((document.fullScreenElement !== undefined && document.fullScreenElement === null) ||
+         (document.msFullscreenElement !== undefined && document.msFullscreenElement === null) ||
+         (document.mozFullScreen !== undefined && !document.mozFullScreen) ||
+         (document.webkitIsFullScreen !== undefined && !document.webkitIsFullScreen));
+    }
+
     // Utility function to retry tasks max n times until the execution is successful.
     retry(taskName, task, attempts = 10, interval = 200) {
         let succeeded = false;
         try {
             succeeded = task();
         } catch (ex) {
-            logError(`Got exception runnning ${taskName} task: ${ex}`);
+            logError(`Got exception running ${taskName} task: ${ex}`);
         }
         if (succeeded) {
             logDebug(`${taskName} succeeded`);
@@ -292,7 +330,10 @@ window.addEventListener('load', () => {
     // This prevents the infinite spinner problem.
     // See https://github.com/MozillaReality/FirefoxReality/issues/1433
     if (youtube.isWatchingPage()) {
-        youtube.waitForVideoReady(() => youtube.overrideQualityRetry());
+        youtube.waitForVideoReady(() => {
+            youtube.hideOverlays();
+            youtube.overrideQualityRetry();
+        });
     }
 });
 
@@ -301,3 +342,5 @@ window.addEventListener('popstate', () => youtube.overrideVideoProjection());
 window.addEventListener('click', event => youtube.overrideClick(event));
 window.addEventListener('mouseup', event => youtube.playerFixes());
 window.addEventListener("yt-navigate-start", () => youtube.playerFixes());
+
+window.addEventListener("yt-navigate-finish", () => youtube.hideOverlays());
