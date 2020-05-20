@@ -10,7 +10,7 @@ const YT_SELECTORS = {
   thumbnail: '.ytp-cued-thumbnail-overlay-image',
   embedTitle: '.ytp-title-text',
   queueHandle: 'ytd-playlist-panel-video-renderer',
-  playbackControls: '.ytp-left-controls'
+  playbackControls: '.ytp-left-controls',
   overlays: '.videowall-endscreen, .ytp-upnext, .ytp-ce-element'
 };
 const ENABLE_LOGS = true;
@@ -157,7 +157,8 @@ class YoutubeExtension {
 
     // Fix for the draggable items to continue being draggable when a context menu is displayed.
     // https://github.com/MozillaReality/FirefoxReality/issues/2611
-    fixQueueContextMenu() {
+    queueContextMenuFix() {
+        logDebug('queueContextMenuFix');
         const handles = document.querySelectorAll(YT_SELECTORS.queueHandle);
         for (var i=0; i<handles.length; i++) {
             handles[i].removeEventListener('contextmenu', this.onContextMenu);
@@ -180,9 +181,10 @@ class YoutubeExtension {
     }
 
     // Prevent the double click to reach the player to avoid double clicking
-    // to trigger a playback forward event.
+    // to trigger a playback forward/backward event.
     // https://github.com/MozillaReality/FirefoxReality/issues/2947
     videoControlsForwardFix() {
+        logDebug('videoControlsForwardFix');
         const playbackControls = document.querySelector(YT_SELECTORS.playbackControls);
         playbackControls.removeEventListener("touchstart", this.videoControlsOnTouchStart);
         playbackControls.addEventListener("touchstart", this.videoControlsOnTouchStart);
@@ -201,7 +203,10 @@ class YoutubeExtension {
     }
 
     playerFixes() {
-        this.fixQueueContextMenu();
+        this.overrideVideoProjection();
+        this.overrideQualityRetry();
+        this.hideOverlaysFix();
+        this.queueContextMenuFix();
         this.videoControlsForwardFix();
     }
 
@@ -265,8 +270,9 @@ class YoutubeExtension {
 
     // Hide overlays when in immersive mode
     // https://github.com/MozillaReality/FirefoxReality/issues/2673
-    hideOverlays() {
+    hideOverlaysFix() {
         if (youtube.is360Video() || youtube.isStereoVideo()) {
+            logDebug('hideOverlaysFix');
             var overlays = document.querySelectorAll(YT_SELECTORS.overlays);
             var observer = new MutationObserver((mutations) => {
                 if (youtube.isInFullscreen()) {
@@ -324,23 +330,16 @@ youtube.overrideUA();
 youtube.overrideViewport();
 window.addEventListener('load', () => {
     logDebug('page load');
-    youtube.overrideVideoProjection();
-    youtube.fixQueueContextMenu();
     // Wait until video has loaded the first frame to force quality change.
     // This prevents the infinite spinner problem.
     // See https://github.com/MozillaReality/FirefoxReality/issues/1433
     if (youtube.isWatchingPage()) {
-        youtube.waitForVideoReady(() => {
-            youtube.hideOverlays();
-            youtube.overrideQualityRetry();
-        });
+        youtube.waitForVideoReady(() => youtube.playerFixes());
     }
 });
 
 window.addEventListener('pushstate', () => youtube.overrideVideoProjection());
 window.addEventListener('popstate', () => youtube.overrideVideoProjection());
 window.addEventListener('click', event => youtube.overrideClick(event));
-window.addEventListener('mouseup', event => youtube.playerFixes());
-window.addEventListener("yt-navigate-start", () => youtube.playerFixes());
-
-window.addEventListener("yt-navigate-finish", () => youtube.hideOverlays());
+window.addEventListener('mouseup', event => youtube.queueContextMenuFix());
+window.addEventListener("yt-navigate-finish", () => youtube.playerFixes());
