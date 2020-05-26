@@ -14,7 +14,9 @@
 #include <android_native_app_glue.h>
 #include <cstdlib>
 #include <vrb/RunnableQueue.h>
-#if defined(OCULUSVR)
+#if defined(OPENXR)
+#include "DeviceDelegateOpenXR.h"
+#elif defined(OCULUSVR)
 #include "DeviceDelegateOculusVR.h"
 #endif
 
@@ -28,7 +30,10 @@
 
 using namespace crow;
 
-#if defined(OCULUSVR)
+#if defined(OPENXR)
+typedef DeviceDelegateOpenXR PlatformDeviceDelegate;
+typedef DeviceDelegateOpenXRPtr PlatformDeviceDelegatePtr;
+#elif defined(OCULUSVR)
 typedef DeviceDelegateOculusVR PlatformDeviceDelegate;
 typedef DeviceDelegateOculusVRPtr PlatformDeviceDelegatePtr;
 #endif
@@ -232,8 +237,6 @@ android_main(android_app *aAppState) {
         pSource->process(aAppState, pSource);
       }
 
-
-
       // Check if we are exiting.
       if (aAppState->destroyRequested != 0) {
         sAppContext->mEgl->MakeCurrent();
@@ -254,8 +257,9 @@ android_main(android_app *aAppState) {
     }
     sAppContext->mQueue->ProcessRunnables();
     if (!BrowserWorld::Instance().IsPaused() && sAppContext->mDevice->IsInVRMode()) {
-      VRB_GL_CHECK(glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT));
       BrowserWorld::Instance().Draw();
+    } else {
+      sAppContext->mDevice->ProcessEvents();
     }
   }
 }

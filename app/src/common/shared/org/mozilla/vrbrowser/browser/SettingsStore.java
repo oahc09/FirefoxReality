@@ -436,7 +436,7 @@ public class SettingsStore {
             return true;
         }
         Log.i(LOGTAG, "Layers are not supported");
-        return false;
+        return true;
     }
 
     public int getTransparentBorderWidth() {
